@@ -4,11 +4,21 @@
 -- Run this in your Supabase SQL Editor:
 -- https://supabase.com/dashboard → SQL Editor → New Query
 
--- 1. MEDICATIONS TABLE
--- Stores each medication's info
+-- 1. PATIENTS TABLE
+-- Stores patients/profiles under care
+CREATE TABLE IF NOT EXISTS patients (
+  id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+  name TEXT NOT NULL,
+  created_by UUID REFERENCES auth.users(id) ON DELETE CASCADE NOT NULL,
+  created_at TIMESTAMPTZ DEFAULT now()
+);
+
+-- 2. MEDICATIONS TABLE
+-- Stores each medication's info linked to user and patient
 CREATE TABLE IF NOT EXISTS medications (
   id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
   user_id UUID REFERENCES auth.users(id) ON DELETE CASCADE NOT NULL,
+  patient_id UUID REFERENCES patients(id) ON DELETE CASCADE,
   name TEXT NOT NULL,
   description TEXT DEFAULT '',
   how_to_take TEXT DEFAULT '',
@@ -19,7 +29,7 @@ CREATE TABLE IF NOT EXISTS medications (
   updated_at TIMESTAMPTZ DEFAULT now()
 );
 
--- 2. MEDICATION SCHEDULES TABLE
+-- 3. MEDICATION SCHEDULES TABLE
 -- Defines when each medication should be taken
 CREATE TABLE IF NOT EXISTS medication_schedules (
   id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
@@ -29,7 +39,7 @@ CREATE TABLE IF NOT EXISTS medication_schedules (
   created_at TIMESTAMPTZ DEFAULT now()
 );
 
--- 3. MEDICATION LOGS TABLE
+-- 4. MEDICATION LOGS TABLE
 -- Records actual intake (or missed doses)
 CREATE TABLE IF NOT EXISTS medication_logs (
   id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
@@ -46,8 +56,10 @@ CREATE TABLE IF NOT EXISTS medication_logs (
 -- ============================================
 -- INDEXES
 -- ============================================
+CREATE INDEX IF NOT EXISTS idx_patients_created_by ON patients(created_by);
 CREATE INDEX IF NOT EXISTS idx_medications_user_id ON medications(user_id);
-CREATE INDEX IF NOT EXISTS idx_medications_active ON medications(user_id, active);
+CREATE INDEX IF NOT EXISTS idx_medications_patient_id ON medications(patient_id);
+CREATE INDEX IF NOT EXISTS idx_medications_active ON medications(patient_id, active);
 CREATE INDEX IF NOT EXISTS idx_schedules_medication_id ON medication_schedules(medication_id);
 CREATE INDEX IF NOT EXISTS idx_schedules_day ON medication_schedules(day_of_week);
 CREATE INDEX IF NOT EXISTS idx_logs_user_date ON medication_logs(user_id, scheduled_date);
@@ -58,9 +70,27 @@ CREATE INDEX IF NOT EXISTS idx_logs_medication_date ON medication_logs(medicatio
 -- ============================================
 
 -- Enable RLS on all tables
+ALTER TABLE patients ENABLE ROW LEVEL SECURITY;
 ALTER TABLE medications ENABLE ROW LEVEL SECURITY;
 ALTER TABLE medication_schedules ENABLE ROW LEVEL SECURITY;
 ALTER TABLE medication_logs ENABLE ROW LEVEL SECURITY;
+
+-- Patients: users can only CRUD their own
+CREATE POLICY "Users can view own patients"
+  ON patients FOR SELECT
+  USING (auth.uid() = created_by);
+
+CREATE POLICY "Users can insert own patients"
+  ON patients FOR INSERT
+  WITH CHECK (auth.uid() = created_by);
+
+CREATE POLICY "Users can update own patients"
+  ON patients FOR UPDATE
+  USING (auth.uid() = created_by);
+
+CREATE POLICY "Users can delete own patients"
+  ON patients FOR DELETE
+  USING (auth.uid() = created_by);
 
 -- Medications: users can only CRUD their own
 CREATE POLICY "Users can view own medications"
