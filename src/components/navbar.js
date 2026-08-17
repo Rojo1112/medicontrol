@@ -5,30 +5,32 @@
 import { getCurrentRoute } from '../utils/router.js';
 
 export function renderNavbar() {
-  const currentRoute = getCurrentRoute();
-
-  const items = [
-    { path: '/dashboard', icon: '📋', label: 'Hoy' },
-    { path: '/medications', icon: '💊', label: 'Medicinas' },
-    { path: '/history', icon: '📊', label: 'Historial' },
-    { path: 'logout', icon: '🚪', label: 'Salir', action: true },
-  ];
-
+  const currentPath = window.location.hash.replace('#', '') || '/';
+  const patientName = localStorage.getItem('selected_patient_name') || 'Paciente';
+  
   return `
-    <nav class="navbar" id="main-navbar">
-      <div class="navbar-inner">
-        ${items.map(item => item.action
-          ? `<button onclick="handleLogout()" class="nav-item" id="nav-logout">
-              <span class="nav-icon">${item.icon}</span>
-              <span>${item.label}</span>
-            </button>`
-          : `<a href="#${item.path}" 
-             class="nav-item ${currentRoute === item.path ? 'active' : ''}"
-             id="nav-${item.path.slice(1)}">
-            <span class="nav-icon">${item.icon}</span>
-            <span>${item.label}</span>
-          </a>`
-        ).join('')}
+    <nav class="navbar glass-card">
+      <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:var(--space-sm); font-size:0.875rem; color:var(--text-muted);">
+        <span>👤 ${patientName}</span>
+        <a href="#/patients" style="color:var(--accent); text-decoration:none; font-weight:500;">Cambiar</a>
+      </div>
+      <div style="display:flex; justify-content:space-between; align-items:center;">
+        <a href="#/dashboard" class="nav-item ${currentPath === '/dashboard' ? 'active' : ''}">
+          <span class="nav-icon">📅</span>
+          <span>Hoy</span>
+        </a>
+        <a href="#/medications" class="nav-item ${currentPath === '/medications' ? 'active' : ''}">
+          <span class="nav-icon">💊</span>
+          <span>Medicinas</span>
+        </a>
+        <a href="#/history" class="nav-item ${currentPath === '/history' ? 'active' : ''}">
+          <span class="nav-icon">📋</span>
+          <span>Historial</span>
+        </a>
+        <button class="nav-item" style="border:none; background:transparent; cursor:pointer;" onclick="window.handleLogout()">
+          <span class="nav-icon">🚪</span>
+          <span>Salir</span>
+        </button>
       </div>
     </nav>
   `;

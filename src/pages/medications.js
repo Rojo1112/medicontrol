@@ -38,11 +38,13 @@ export async function renderMedications(container) {
 
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) return;
+    const patientId = localStorage.getItem('selected_patient_id');
+    if (!patientId) return;
 
     const { data: meds } = await supabase
       .from('medications')
       .select('*')
-      .eq('user_id', user.id)
+      .eq('patient_id', patientId)
       .eq('active', true)
       .order('created_at', { ascending: false });
 
@@ -113,6 +115,8 @@ export async function renderMedications(container) {
 
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) return;
+    const patientId = localStorage.getItem('selected_patient_id');
+    if (!patientId) return;
 
     const payload = {
       name,
@@ -121,6 +125,7 @@ export async function renderMedications(container) {
       dose: document.getElementById('med-dose')?.value?.trim() || '',
       color: formData.color,
       user_id: user.id,
+      patient_id: patientId,
     };
 
     try {

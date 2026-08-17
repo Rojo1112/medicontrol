@@ -7,7 +7,7 @@ import { renderNavbar } from '../components/navbar.js';
 import { showToast } from '../components/toast.js';
 import {
   formatDate, formatDateISO, formatTime12, getToday,
-  addDays, getDayName, getDayOfWeek, isToday
+  addDays, getDayName, getDayOfWeek, isToday, parseLocalDate
 } from '../utils/dates.js';
 
 export async function renderHistory(container) {
@@ -31,12 +31,14 @@ export async function renderHistory(container) {
 
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) return;
+    const patientId = localStorage.getItem('selected_patient_id');
+    if (!patientId) return;
 
     // Get medications
     const { data: meds } = await supabase
       .from('medications')
       .select('*')
-      .eq('user_id', user.id);
+      .eq('patient_id', patientId);
 
     medications = {};
     (meds || []).forEach(m => { medications[m.id] = m; });
@@ -46,8 +48,8 @@ export async function renderHistory(container) {
     // Get logs for the week
     const { data: logs } = await supabase
       .from('medication_logs')
-      .select('*')
-      .eq('user_id', user.id)
+      .select('*, medications!inner(*)')
+      .eq('medications.patient_id', patientId)
       .gte('scheduled_date', weekDates[0])
       .lte('scheduled_date', weekDates[weekDates.length - 1])
       .order('scheduled_time', { ascending: true });
@@ -125,7 +127,7 @@ export async function renderHistory(container) {
                     ${getDayName(getDayOfWeek(date))}
                   </div>
                   <div style="font-size:var(--font-size-lg); font-weight:700; color:${isSelected ? 'var(--accent)' : 'var(--text-primary)'};">
-                    ${new Date(date + 'T12:00:00').getDate()}
+                    ${parseLocalDate(date).getDate()}
                   </div>
                   ${stats.total > 0 ? `
                     <div style="

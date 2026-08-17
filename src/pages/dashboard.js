@@ -22,12 +22,14 @@ export async function renderDashboard(container) {
 
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) return;
+    const patientId = localStorage.getItem('selected_patient_id');
+    if (!patientId) return;
 
     // Get all active medications for the user
     const { data: meds } = await supabase
       .from('medications')
       .select('*')
-      .eq('user_id', user.id)
+      .eq('patient_id', patientId)
       .eq('active', true);
 
     medications = {};
@@ -51,11 +53,10 @@ export async function renderDashboard(container) {
       .eq('day_of_week', dayOfWeek)
       .order('time_of_day', { ascending: true });
 
-    // Get existing logs for this date
     const { data: logs } = await supabase
       .from('medication_logs')
-      .select('*')
-      .eq('user_id', user.id)
+      .select('*, medications!inner(*)')
+      .eq('medications.patient_id', patientId)
       .eq('scheduled_date', currentDate);
 
     const logMap = {};

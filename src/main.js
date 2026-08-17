@@ -6,6 +6,7 @@ import './style.css';
 import { supabase } from './lib/supabase.js';
 import { registerRoute, initRouter, navigate } from './utils/router.js';
 import { renderAuth } from './pages/auth.js';
+import { renderPatients } from './pages/patients.js';
 import { renderDashboard } from './pages/dashboard.js';
 import { renderMedications } from './pages/medications.js';
 import { renderHistory } from './pages/history.js';
@@ -34,25 +35,49 @@ function withAuth(pageHandler) {
   };
 }
 
+// Patient context guard wrapper
+function withPatient(pageHandler) {
+  return async (container) => {
+    const { data: { session } } = await supabase.auth.getSession();
+    if (!session) {
+      navigate('/');
+      return;
+    }
+    const patientId = localStorage.getItem('selected_patient_id');
+    if (!patientId) {
+      navigate('/patients');
+      return;
+    }
+    return pageHandler(container);
+  };
+}
+
 // Register routes
 registerRoute('/', async (container) => {
   const { data: { session } } = await supabase.auth.getSession();
   if (session) {
-    navigate('/dashboard');
+    navigate('/patients');
     return;
   }
   return renderAuth(container);
 });
 
-registerRoute('/dashboard', withAuth(renderDashboard));
-registerRoute('/medications', withAuth(renderMedications));
-registerRoute('/history', withAuth(renderHistory));
+registerRoute('/patients', withAuth(renderPatients));
+registerRoute('/dashboard', withPatient(renderDashboard));
+registerRoute('/medications', withPatient(renderMedications));
+registerRoute('/history', withPatient(renderHistory));
 
 // Listen to auth state changes
 supabase.auth.onAuthStateChange((event, session) => {
   if (event === 'SIGNED_IN') {
-    navigate('/dashboard');
+    // Solo navegamos a patients si estamos en la raíz (login)
+    // para evitar interrumpir recargas de página
+    if (window.location.hash === '' || window.location.hash === '#/') {
+      navigate('/patients');
+    }
   } else if (event === 'SIGNED_OUT') {
+    localStorage.removeItem('selected_patient_id');
+    localStorage.removeItem('selected_patient_name');
     navigate('/');
   }
 });
