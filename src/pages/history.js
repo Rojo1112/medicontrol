@@ -45,6 +45,32 @@ export async function renderHistory(container) {
 
     weekDates = getWeekDates(currentDate);
 
+    // Auto-heal logs from today that were tagged with the wrong scheduled_date
+    const todayStr = getToday();
+    const yesterdayStr = addDays(todayStr, -1);
+    const { data: wrongLogs } = await supabase
+      .from('medication_logs')
+      .select('id, scheduled_date, taken_at, created_at, medications!inner(patient_id)')
+      .eq('medications.patient_id', patientId)
+      .eq('scheduled_date', yesterdayStr);
+
+    if (wrongLogs && wrongLogs.length > 0) {
+      const toFixIds = wrongLogs
+        .filter(l => {
+          const dateToCheck = l.taken_at || l.created_at;
+          if (!dateToCheck) return false;
+          return formatDateISO(dateToCheck) === todayStr;
+        })
+        .map(l => l.id);
+
+      if (toFixIds.length > 0) {
+        await supabase
+          .from('medication_logs')
+          .update({ scheduled_date: todayStr })
+          .in('id', toFixIds);
+      }
+    }
+
     // Get logs for the week
     const { data: logs } = await supabase
       .from('medication_logs')
