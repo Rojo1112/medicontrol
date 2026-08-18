@@ -89,12 +89,16 @@ export async function renderDashboard(container) {
 
     const logMap = {};
     (logs || []).forEach(l => {
-      logMap[`${l.schedule_id}_${l.scheduled_time}`] = l;
+      if (l.schedule_id) logMap[l.schedule_id] = l;
+      const normalizedTime = (l.scheduled_time || '').substring(0, 5);
+      if (l.schedule_id) logMap[`${l.schedule_id}_${normalizedTime}`] = l;
+      if (l.medication_id) logMap[`${l.medication_id}_${normalizedTime}`] = l;
     });
 
     // Merge schedules with logs
     entries = (schedules || []).map(s => {
-      const log = logMap[`${s.id}_${s.time_of_day}`];
+      const normalizedTime = (s.time_of_day || '').substring(0, 5);
+      const log = logMap[s.id] || logMap[`${s.id}_${normalizedTime}`] || logMap[`${s.medication_id}_${normalizedTime}`];
       const med = medications[s.medication_id];
       return {
         scheduleId: s.id,
@@ -276,7 +280,10 @@ export async function renderDashboard(container) {
     if (!entry) return;
 
     const { data: { user } } = await supabase.auth.getUser();
-    if (!user) return;
+    if (!user) {
+      showToast('Sesión no válida. Inicia sesión de nuevo.', 'error');
+      return;
+    }
 
     try {
       if (action === 'take' || action === 'skip') {
@@ -284,30 +291,54 @@ export async function renderDashboard(container) {
 
         if (entry.logId) {
           // Update existing log
-          await supabase
+          const { error } = await supabase
             .from('medication_logs')
             .update({
               status: newStatus,
               taken_at: action === 'take' ? new Date().toISOString() : null,
             })
             .eq('id', entry.logId);
-        } else {
-          // Insert new log
-          const { data } = await supabase
-            .from('medication_logs')
-            .insert({
-              schedule_id: entry.scheduleId,
-              medication_id: entry.medicationId,
-              user_id: user.id,
-              scheduled_date: currentDate,
-              scheduled_time: entry.time,
-              status: newStatus,
-              taken_at: action === 'take' ? new Date().toISOString() : null,
-            })
-            .select()
-            .single();
 
-          if (data) entry.logId = data.id;
+          if (error) throw error;
+        } else {
+          // Check if log already exists in DB for this schedule and date
+          const { data: existingLog } = await supabase
+            .from('medication_logs')
+            .select('id')
+            .eq('schedule_id', entry.scheduleId)
+            .eq('scheduled_date', currentDate)
+            .maybeSingle();
+
+          if (existingLog) {
+            entry.logId = existingLog.id;
+            const { error } = await supabase
+              .from('medication_logs')
+              .update({
+                status: newStatus,
+                taken_at: action === 'take' ? new Date().toISOString() : null,
+              })
+              .eq('id', existingLog.id);
+
+            if (error) throw error;
+          } else {
+            // Insert new log
+            const { data, error } = await supabase
+              .from('medication_logs')
+              .insert({
+                schedule_id: entry.scheduleId,
+                medication_id: entry.medicationId,
+                user_id: user.id,
+                scheduled_date: currentDate,
+                scheduled_time: entry.time,
+                status: newStatus,
+                taken_at: action === 'take' ? new Date().toISOString() : null,
+              })
+              .select()
+              .single();
+
+            if (error) throw error;
+            if (data) entry.logId = data.id;
+          }
         }
 
         entry.status = newStatus;
@@ -319,10 +350,26 @@ export async function renderDashboard(container) {
         );
       } else if (action === 'undo') {
         if (entry.logId) {
-          await supabase
+          const { error } = await supabase
             .from('medication_logs')
             .update({ status: 'pending', taken_at: null })
             .eq('id', entry.logId);
+
+          if (error) throw error;
+        } else {
+          const { data: existingLog } = await supabase
+            .from('medication_logs')
+            .select('id')
+            .eq('schedule_id', entry.scheduleId)
+            .eq('scheduled_date', currentDate)
+            .maybeSingle();
+
+          if (existingLog) {
+            await supabase
+              .from('medication_logs')
+              .update({ status: 'pending', taken_at: null })
+              .eq('id', existingLog.id);
+          }
         }
 
         entry.status = 'pending';
@@ -332,7 +379,8 @@ export async function renderDashboard(container) {
 
       render();
     } catch (err) {
-      showToast('Error al actualizar. Intenta de nuevo.', 'error');
+      console.error('Error al actualizar toma:', err);
+      showToast('Error al actualizar: ' + (err.message || 'Intenta de nuevo'), 'error');
     }
   }
 
