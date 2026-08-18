@@ -43,11 +43,11 @@ export async function renderPatients(container) {
         localStorage.removeItem('selected_patient_name');
       }
 
-      showToast('Paciente eliminado ✓', 'info');
+      showToast('Paciente borrado exitosamente ✓', 'info');
       patientToDelete = null;
       await loadPatients();
     } catch (err) {
-      showToast('Error al eliminar paciente: ' + err.message, 'error');
+      showToast('Error al borrar paciente: ' + err.message, 'error');
     }
   }
 
@@ -56,20 +56,23 @@ export async function renderPatients(container) {
 
     return `
       <div class="modal-overlay open" id="delete-patient-overlay">
-        <div class="modal" style="max-width: 420px; text-align: center;">
+        <div class="modal" style="max-width: 420px; text-align: center; border: 1px solid hsla(0 80% 60% / 0.3);">
           <div class="modal-header" style="justify-content: flex-end; padding-bottom: 0;">
             <button class="modal-close" id="cancel-delete-x">✕</button>
           </div>
           <div class="modal-body" style="padding-top: 0;">
-            <div style="font-size: 3rem; margin-bottom: var(--space-xs);">⚠️</div>
-            <h2 class="modal-title" style="font-size: 1.35rem; margin-bottom: var(--space-xs);">¿Eliminar paciente?</h2>
+            <div style="font-size: 3.5rem; margin-bottom: var(--space-xs);">⚠️</div>
+            <h2 class="modal-title" style="font-size: 1.35rem; margin-bottom: var(--space-xs); color: var(--danger-text);">¿Borrar paciente?</h2>
             <p style="color: var(--text-secondary); font-size: 0.95rem; line-height: 1.5;">
-              Se eliminará a <strong style="color: var(--text-primary);">${patientToDelete.name}</strong> junto con todos sus medicamentos, horarios e historial de tomas. Esta acción no se puede deshacer.
+              ¿Estás seguro de que deseas borrar a <strong style="color: var(--text-primary); font-size: 1.05rem;">"${patientToDelete.name}"</strong>?
+            </p>
+            <p style="color: var(--text-muted); font-size: 0.825rem; margin-top: var(--space-xs);">
+              Se borrarán automáticamente todos sus medicamentos, horarios y registros asociados.
             </p>
           </div>
           <div class="modal-footer" style="justify-content: center; gap: var(--space-md); padding-top: var(--space-md);">
             <button type="button" class="btn btn--secondary" id="cancel-delete-btn">Cancelar</button>
-            <button type="button" class="btn btn--danger" id="confirm-delete-btn">Eliminar Paciente</button>
+            <button type="button" class="btn btn--danger" id="confirm-delete-btn">Sí, Borrar Paciente</button>
           </div>
         </div>
       </div>
@@ -77,19 +80,21 @@ export async function renderPatients(container) {
   }
 
   function render() {
+    const activePatientId = localStorage.getItem('selected_patient_id');
+
     container.innerHTML = `
       <div class="page-container">
         <header style="margin-bottom: var(--space-lg); text-align: center;">
           <div style="font-size: 3rem; margin-bottom: var(--space-sm);">👥</div>
-          <h1 class="page-title animate-in">Pacientes</h1>
-          <p class="page-subtitle animate-in animate-in-delay-1">Selecciona a quién vas a cuidar hoy</p>
+          <h1 class="page-title animate-in">Gestión de Pacientes</h1>
+          <p class="page-subtitle animate-in animate-in-delay-1">Selecciona, agrega o borra pacientes</p>
         </header>
 
         <!-- Formulario para agregar paciente -->
         <div class="glass-card animate-in animate-in-delay-1" style="margin-bottom: var(--space-xl);">
           <form id="add-patient-form" style="display: flex; gap: var(--space-sm);">
-            <input type="text" id="patient-name" class="form-input" placeholder="Nombre del paciente (ej: Mamá, Juan...)" required style="flex: 1;" />
-            <button type="submit" class="btn btn--primary">Agregar</button>
+            <input type="text" id="patient-name" class="form-input" placeholder="Nombre del nuevo paciente (ej: Mamá, Juan...)" required style="flex: 1;" />
+            <button type="submit" class="btn btn--primary">＋ Agregar</button>
           </form>
         </div>
 
@@ -102,38 +107,33 @@ export async function renderPatients(container) {
           <div class="empty-state animate-in animate-in-delay-2">
             <span class="empty-state-icon">👤</span>
             <h2 class="empty-state-title">Aún no hay pacientes</h2>
-            <p class="empty-state-text">Agrega el primer paciente en el formulario de arriba.</p>
+            <p class="empty-state-text">Agrega tu primer paciente en el formulario de arriba.</p>
           </div>
         ` : `
           <div style="display: grid; gap: var(--space-md); grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));" class="animate-in animate-in-delay-2">
-            ${patients.map(p => `
-              <div class="glass-card patient-card" data-id="${p.id}" data-name="${p.name}" style="cursor: pointer; position: relative; transition: transform 0.2s, background 0.2s; text-align: center; padding: var(--space-xl) var(--space-lg) var(--space-lg);">
-                <button class="delete-patient-btn" data-id="${p.id}" data-name="${p.name}" title="Eliminar paciente" style="
-                  position: absolute;
-                  top: 12px;
-                  right: 12px;
-                  width: 32px;
-                  height: 32px;
-                  border-radius: var(--radius-full);
-                  border: 1px solid var(--border-color);
-                  background: var(--bg-surface);
-                  color: var(--text-tertiary);
-                  cursor: pointer;
-                  display: grid;
-                  place-items: center;
-                  font-size: 14px;
-                  transition: all var(--transition-fast);
-                  z-index: 2;
-                ">
-                  🗑️
-                </button>
-                <div style="width: 60px; height: 60px; border-radius: 50%; background: var(--accent-soft); color: var(--accent); display: flex; align-items: center; justify-content: center; font-size: 1.5rem; font-weight: bold; margin: 0 auto var(--space-md);">
-                  ${p.name.charAt(0).toUpperCase()}
+            ${patients.map(p => {
+              const isSelected = p.id === activePatientId;
+              return `
+                <div class="glass-card patient-card ${isSelected ? 'selected-patient' : ''}" style="display: flex; flex-direction: column; justify-content: space-between; text-align: center; padding: var(--space-lg); ${isSelected ? 'border-color: var(--accent); box-shadow: var(--shadow-glow);' : ''}">
+                  <div>
+                    ${isSelected ? `<span class="badge badge--success" style="margin-bottom: var(--space-sm);">✓ Activo</span>` : ''}
+                    <div style="width: 60px; height: 60px; border-radius: 50%; background: var(--accent-soft); color: var(--accent); display: flex; align-items: center; justify-content: center; font-size: 1.5rem; font-weight: bold; margin: 0 auto var(--space-sm);">
+                      ${p.name.charAt(0).toUpperCase()}
+                    </div>
+                    <h3 style="margin: 0; font-size: 1.25rem; font-weight: 600;">${p.name}</h3>
+                  </div>
+
+                  <div style="display: flex; gap: var(--space-xs); margin-top: var(--space-md); justify-content: center;">
+                    <button class="btn btn--primary select-patient-btn" data-id="${p.id}" data-name="${p.name}" style="flex: 1; font-size: 0.875rem; padding: var(--space-xs) var(--space-sm);">
+                      ${isSelected ? 'Ver Hoy →' : 'Seleccionar'}
+                    </button>
+                    <button class="btn btn--secondary delete-patient-btn" data-id="${p.id}" data-name="${p.name}" title="Borrar paciente" style="color: var(--danger-text); border-color: hsla(0 80% 60% / 0.3); padding: var(--space-xs) var(--space-sm); font-size: 0.875rem;">
+                      🗑️ Borrar
+                    </button>
+                  </div>
                 </div>
-                <h3 style="margin: 0; font-size: 1.25rem; font-weight: 600;">${p.name}</h3>
-                <p style="margin: var(--space-xs) 0 0; font-size: 0.875rem; color: var(--text-muted);">Ver medicamentos →</p>
-              </div>
-            `).join('')}
+              `;
+            }).join('')}
           </div>
         `}
         
@@ -213,13 +213,10 @@ export async function renderPatients(container) {
     });
 
     // Patient card selection
-    container.querySelectorAll('.patient-card').forEach(card => {
-      card.addEventListener('click', (e) => {
-        // Prevent navigating if clicking delete button
-        if (e.target.closest('.delete-patient-btn')) return;
-
-        const id = card.dataset.id;
-        const name = card.dataset.name;
+    container.querySelectorAll('.select-patient-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const id = btn.dataset.id;
+        const name = btn.dataset.name;
         // Guardar en localStorage para contexto global
         localStorage.setItem('selected_patient_id', id);
         localStorage.setItem('selected_patient_name', name);
@@ -236,23 +233,6 @@ export async function renderPatients(container) {
         navigate('/');
     });
   }
-
-  // Inject hover styles dynamically
-  const style = document.createElement('style');
-  style.innerHTML = `
-    .patient-card:hover {
-        transform: translateY(-4px);
-        background: hsla(var(--glass-bg-base) / 0.8);
-        box-shadow: 0 12px 24px -10px hsla(0 0% 0% / 0.3);
-    }
-    .delete-patient-btn:hover {
-        background: var(--danger-soft) !important;
-        color: var(--danger-text) !important;
-        border-color: var(--danger) !important;
-        transform: scale(1.1);
-    }
-  `;
-  document.head.appendChild(style);
 
   await loadPatients();
 }
