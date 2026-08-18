@@ -19,15 +19,17 @@ export function parseLocalDate(dateInput) {
   if (dateInput instanceof Date) return new Date(dateInput.getTime());
 
   if (typeof dateInput === 'string') {
-    const cleanStr = dateInput.trim().split('T')[0];
-    const match = cleanStr.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+    const trimmed = dateInput.trim();
+    // Only match pure 'YYYY-MM-DD' dates
+    const match = trimmed.match(/^(\d{4})-(\d{2})-(\d{2})$/);
     if (match) {
       const y = parseInt(match[1], 10);
       const m = parseInt(match[2], 10) - 1;
       const d = parseInt(match[3], 10);
       return new Date(y, m, d, 12, 0, 0); // 12:00 PM local time avoids DST and UTC shifts
     }
-    const dObj = new Date(dateInput);
+    // Full ISO timestamp (e.g. 2026-08-18T00:15:00.000Z) or other date formats
+    const dObj = new Date(trimmed);
     if (!isNaN(dObj.getTime())) return dObj;
   }
 
@@ -75,7 +77,11 @@ export function formatTime24(time24) {
 }
 
 export function getToday() {
-  return formatDateISO(new Date());
+  const now = new Date();
+  const y = now.getFullYear();
+  const m = String(now.getMonth() + 1).padStart(2, '0');
+  const d = String(now.getDate()).padStart(2, '0');
+  return `${y}-${m}-${d}`;
 }
 
 export function getDayOfWeek(dateStr) {
